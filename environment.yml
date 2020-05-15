@@ -1,0 +1,14 @@
+name: Viewer
+channels:
+  - conda-forge
+  - pelson
+  - defaults
+dependencies:
+  - netcdf4
+  - numpy
+  - ossuuid=1.6.2=h0a44026_1000
+  - pip=20.0.2=py_2
+  - python=3
+  - matplotlib
+  - ipywidgets
+  - ipympl

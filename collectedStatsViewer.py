@@ -1,4 +1,3 @@
-from ipywidgets import interactive
 from matplotlib import pyplot
 
 import ipywidgets as widgets
