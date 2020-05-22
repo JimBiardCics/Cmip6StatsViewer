@@ -243,9 +243,17 @@ class StatsViewer(object):
 
         plotValues = numpy.ma.masked_all(shape, dtype = values.dtype)
 
+        def mapIndices(mapList, indices):
+            mappedIndices = list()
+
+            for mapper, index in zip(mapList, indices):
+                mappedIndices.append(mapper.index(index))
+
+            return tuple(mappedIndices)
+
         for inIndices in zip(*indices):
 
-            outIndices = tuple([ indexMap[i].index(inIndices[i]) for i in range(0,6) ])
+            outIndices = mapIndices(indexMap, inIndices)
 
             plotValues[outIndices] = values[inIndices]
 
@@ -260,6 +268,9 @@ class StatsViewer(object):
 
 
             for model in modelsSelected:
+                if model not in names[0]:
+                    continue
+
                 modelIndex = self.models.index(model) - 1
 
                 for yearRange in self.yearRanges[1:]:
@@ -310,8 +321,8 @@ class StatsViewer(object):
 
             historicalShape = (
                 len(historicalNames[0]),
-                len(historicalNames[1]),
-                len(historicalNames[2]),
+                1,
+                1,
                 len(historicalNames[3]),
                 len(historicalNames[4]),
                 len(historicalNames[5])
@@ -319,8 +330,18 @@ class StatsViewer(object):
 
             historicalValues = numpy.ma.masked_all(historicalShape, dtype = values.dtype)
 
+            def mapIndices(mapList, indices):
+                mappedIndices = list()
+
+                for i, (mapper, index) in enumerate(zip(mapList, indices)):
+                    outIndex = 0 if i in (1, 2) else mapper.index(index)
+
+                    mappedIndices.append(outIndex)
+
+                return tuple(mappedIndices)
+
             for inIndices in zip(*historicalIndices):
-                outIndices = tuple([ historicalIndexMap[i].index(inIndices[i]) for i in range(0,6) ])
+                outIndices = mapIndices(historicalIndexMap, inIndices)
 
                 historicalValues[outIndices] = values[inIndices]
 
