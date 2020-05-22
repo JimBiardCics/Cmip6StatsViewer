@@ -176,35 +176,55 @@ class StatsViewer(object):
             except:
                 pass
 
-        shape = (
-            len(modelsSelected),
-            len(scenariosSelected),
-            len(rangesSelected),
-            len(climsSelected),
-            len(latsSelected),
-            len(lonsSelected)
-        )
-
-        indices = ( [], [], [], [], [], [] )
+        indices  = ( [], [], [], [], [], [] )
+        indexMap = ( [], [], [], [], [], [] )
+        names    = ( [], [], [], [], [], [] )
         
         for model in modelsSelected:
             modelIndex = self.models.index(model) - 1
-            
+
             for scenario in scenariosSelected:
                 scenarioIndex = self.scenarios.index(scenario) - 1
                 
                 for yearRange in rangesSelected:
                     rangeIndex = self.yearRanges.index(yearRange) - 1
                     
+                    if 0 == values[modelIndex, scenarioIndex, rangeIndex].count():
+                        continue
+
+                    if model not in names[0]:
+                        indexMap[0].append(modelIndex)
+                        names[0].append(model)
+                    
+                    if scenario not in names[1]:
+                        indexMap[1].append(scenarioIndex)
+                        names[1].append(scenario)
+                    
+                    if yearRange not in names[2]:
+                        indexMap[2].append(rangeIndex)
+                        names[2].append(yearRange)
+                    
                     for clim in climsSelected:
                         climIndex = theClims.index(clim)
                     
+                        if clim not in names[3]:
+                            indexMap[3].append(climIndex)
+                            names[3].append(clim)
+                        
                         for latRange in latsSelected:
                             latIndex = self.latRanges.index(latRange) - 1
                         
+                            if latRange not in names[4]:
+                                indexMap[4].append(latIndex)
+                                names[4].append(latRange)
+                            
                             for lonRange in lonsSelected:
                                 lonIndex = self.lonRanges.index(lonRange) - 1
                         
+                                if lonRange not in names[5]:
+                                    indexMap[5].append(lonIndex)
+                                    names[5].append(lonRange)
+                            
                                 indices[0].append(modelIndex)
                                 indices[1].append(scenarioIndex)
                                 indices[2].append(rangeIndex)
@@ -212,22 +232,32 @@ class StatsViewer(object):
                                 indices[4].append(latIndex)
                                 indices[5].append(lonIndex)
 
-        names = [
-            list(modelsSelected),
-            list(scenariosSelected),
-            list(rangesSelected),
-            list(climsSelected),
-            list(latsSelected),
-            list(lonsSelected)
-        ]
+        shape = (
+            len(names[0]),
+            len(names[1]),
+            len(names[2]),
+            len(names[3]),
+            len(names[4]),
+            len(names[5])
+        )
 
-        plotValues = values[indices]
-        plotValues = plotValues.reshape(shape)
-        
+        plotValues = numpy.ma.masked_all(shape, dtype = values.dtype)
+
+        for inIndices in zip(*indices):
+
+            outIndices = tuple([ indexMap[i].index(inIndices[i]) for i in range(0,6) ])
+
+            plotValues[outIndices] = values[inIndices]
+
+        historicalValues = None
+
         if 'values' != yAxisSelected:
-            indices = ( [], [], [], [], [], [] )
+            historicalIndices  = ( [], [], [], [], [], [] )
+            historicalIndexMap = ( [], [], [], [], [], [] )
+            historicalNames    = ( [], [], [], [], [], [] )
 
             scenarioIndex = self.scenarios.index('historical') - 1
+
 
             for model in modelsSelected:
                 modelIndex = self.models.index(model) - 1
@@ -238,35 +268,67 @@ class StatsViewer(object):
                     if 0 == values[modelIndex, scenarioIndex, rangeIndex].count():
                         continue
 
+                    if model not in historicalNames[0]:
+                        historicalIndexMap[0].append(modelIndex)
+                        historicalNames[0].append(model)
+                    
+                    if scenario not in historicalNames[1]:
+                        historicalIndexMap[1].append(scenarioIndex)
+                        historicalNames[1].append('historical')
+                    
+                    if yearRange not in historicalNames[2]:
+                        historicalIndexMap[2].append(rangeIndex)
+                        historicalNames[2].append(yearRange)
+                    
                     for clim in climsSelected:
-                        climIndex = theClims.index(clim) - 1
+                        climIndex = theClims.index(clim)
 
+                        if clim not in historicalNames[3]:
+                            historicalIndexMap[3].append(climIndex)
+                            historicalNames[3].append(clim)
+                        
                         for latRange in latsSelected:
                             latIndex = self.latRanges.index(latRange) - 1
                         
+                            if latRange not in historicalNames[4]:
+                                historicalIndexMap[4].append(latIndex)
+                                historicalNames[4].append(latRange)
+                            
                             for lonRange in lonsSelected:
                                 lonIndex = self.lonRanges.index(lonRange) - 1
                         
-                                indices[0].append(modelIndex)
-                                indices[1].append(scenarioIndex)
-                                indices[2].append(rangeIndex)
-                                indices[3].append(climIndex)        
-                                indices[4].append(latIndex)
-                                indices[5].append(lonIndex)
+                                if lonRange not in historicalNames[5]:
+                                    historicalIndexMap[5].append(lonIndex)
+                                    historicalNames[5].append(lonRange)
+                            
+                                historicalIndices[0].append(modelIndex)
+                                historicalIndices[1].append(scenarioIndex)
+                                historicalIndices[2].append(rangeIndex)
+                                historicalIndices[3].append(climIndex)        
+                                historicalIndices[4].append(latIndex)
+                                historicalIndices[5].append(lonIndex)
 
             historicalShape = (
-                len(modelsSelected),
-                1,
-                1,
-                len(climsSelected),
-                len(latsSelected),
-                len(lonsSelected)
+                len(historicalNames[0]),
+                len(historicalNames[1]),
+                len(historicalNames[2]),
+                len(historicalNames[3]),
+                len(historicalNames[4]),
+                len(historicalNames[5])
             )
-            
-            historicalValues = values[indices].reshape(historicalShape)
 
-            plotValues /= historicalValues
-            
+            historicalValues = numpy.ma.masked_all(historicalShape, dtype = values.dtype)
+
+            print('h indexMap =', historicalIndexMap)
+
+            for inIndices in zip(*historicalIndices):
+                print('inIndices =', inIndices)
+                outIndices = tuple([ historicalIndexMap[i].index(inIndices[i]) for i in range(0,6) ])
+
+                historicalValues[outIndices] = values[inIndices]
+
+            print('p, h=', plotValues.shape, historicalValues.shape)
+
         tailsForTitle = list()
 
         if 'none' != spatialMeanSelected:
@@ -290,8 +352,17 @@ class StatsViewer(object):
 
                 names[index] = [ '%smean' % (name,) ]
 
+            if historicalValues is not None:
+                for index, name, selected in picks:
+                    historicalValues = historicalValues.mean(axis = index, keepdims = True)
+
+        if historicalValues is not None:
+            plotValues /= historicalValues
+
         xAxisIndex = self.xAxisOptions.index(xAxisSelected)
         
+        names = list(names)
+
         xLabels = names.pop(xAxisIndex)
 
         names.append(xLabels)
