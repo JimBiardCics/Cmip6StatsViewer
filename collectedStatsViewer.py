@@ -71,12 +71,26 @@ class StatsViewer(object):
             'ratio to historical'
         )
 
+        self.yUnitsOptions = (
+            '1/week',
+            '1/avg month',
+            '1/avg season',
+            '1/avg year'
+        )
+
+        self.yUnitsFactors = {
+            '1/week':       1.0,
+            '1/avg month':  365.25 / 7.0 / 12.0, # Convert weekly rate to average yearly then divide by 12.
+            '1/avg season': 365.25 / 7.0 / 4.0,  # Convert weekly rate to average yearly then divide by 4.
+            '1/avg year':   365.25 / 7.0         # Convert weekly rate to average yearly.
+        }
+
         self.figure = figure
 
 
     def displayChart(self, modelsSelected, scenariosSelected, climsSelected,
                      rangesSelected, latsSelected, lonsSelected,
-                     spatialMeanSelected, xAxisSelected, yAxisSelected):
+                     spatialMeanSelected, xAxisSelected, yAxisSelected, yUnitsSelected):
         # Build the data selection.
         #
         if 'all seasons' == climsSelected[0]:
@@ -99,6 +113,8 @@ class StatsViewer(object):
             stdevs   = self.monthlyStdevs
         else:
             raise ValueError('Selecting a mix of months and seasons is forbidden')
+
+        values = values * self.yUnitsFactors[yUnitsSelected]
 
         if 'all' == modelsSelected[0]:
             modelsSelected = self.models[1:]
@@ -351,7 +367,7 @@ class StatsViewer(object):
         plotMax = 1.05 * plotValues.max()
         plotMin = 0.85 * plotValues.min()
         
-        plotUnits = self.valueUnits
+        plotUnits = yUnitsSelected
         
         if 'values' != yAxisSelected:
             plotUnits = 'future/historical'
@@ -375,7 +391,7 @@ class StatsViewer(object):
                            xaxis = { 'tickvals': xTicks, 'ticktext': xLabels, 'tickangle':45 },
                            title = title,
                            title_x = 0.5,
-                           height = 1000,
+                           height = 800,
                            margin = { 'b': 40 })
 
         with self.figure.batch_update():
