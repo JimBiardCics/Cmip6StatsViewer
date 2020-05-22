@@ -324,6 +324,8 @@ class StatsViewer(object):
 
                 historicalValues[outIndices] = values[inIndices]
 
+        names = list(names)
+
         tailsForTitle = list()
 
         if 'none' != spatialMeanSelected:
@@ -356,8 +358,6 @@ class StatsViewer(object):
 
         xAxisIndex = self.xAxisOptions.index(xAxisSelected)
         
-        names = list(names)
-
         xLabels = names.pop(xAxisIndex)
 
         names.append(xLabels)
