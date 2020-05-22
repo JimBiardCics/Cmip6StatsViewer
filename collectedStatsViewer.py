@@ -319,15 +319,10 @@ class StatsViewer(object):
 
             historicalValues = numpy.ma.masked_all(historicalShape, dtype = values.dtype)
 
-            print('h indexMap =', historicalIndexMap)
-
             for inIndices in zip(*historicalIndices):
-                print('inIndices =', inIndices)
                 outIndices = tuple([ historicalIndexMap[i].index(inIndices[i]) for i in range(0,6) ])
 
                 historicalValues[outIndices] = values[inIndices]
-
-            print('p, h=', plotValues.shape, historicalValues.shape)
 
         tailsForTitle = list()
 
