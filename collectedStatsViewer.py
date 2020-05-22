@@ -1,4 +1,5 @@
 import plotly.graph_objs as go
+import ipywidgets as widgets
 
 import netCDF4
 import numpy
@@ -10,7 +11,7 @@ import warnings
 
 
 class StatsViewer(object):
-    def __init__(self, inputFile, figure):
+    def __init__(self, inputFile):
         dataset = netCDF4.Dataset(inputFile, 'r')
 
         self.models      = [ 'all' ] + [ x for x in dataset.variables['model_names'][...] ]
@@ -85,7 +86,43 @@ class StatsViewer(object):
             '1/avg year':   365.25 / 7.0         # Convert weekly rate to average yearly.
         }
 
-        self.figure = figure
+        self.figure = go.FigureWidget()
+
+
+    def interact(self):
+        modelSelection       = widgets.SelectMultiple(description = 'Model:', options = self.models, value = ('all',))
+        scenarioSelection    = widgets.SelectMultiple(description = 'Scenario:', options = self.scenarios, value = ('all',))
+        climSelection        = widgets.SelectMultiple(description = 'Climatology:', options = self.clims, value = ('all seasons',))
+        rangeSelection       = widgets.SelectMultiple(description = 'Years:', options = self.yearRanges, value = ('all',))
+        latSelection         = widgets.SelectMultiple(description = 'Latitude:', options = self.latRanges, value = ('all',))
+        lonSelection         = widgets.SelectMultiple(description = 'Longitude:', options = self.lonRanges, value = ('all',))
+        spatialMeanSelection = widgets.Select(description = 'Spatial Mean:', options = self.spatialMeanOptions, value = 'none')
+        xAxisSelection       = widgets.Select(description = 'X Axis:', options = self.xAxisOptions, value = 'climatology time')
+        yAxisSelection       = widgets.Select(description = 'Y Axis:', options = self.yAxisOptions, value = 'values')
+        yUnitsSelection      = widgets.Select(description = 'Y Units:', options = self.yUnitsOptions, value = '1/week')
+
+        argDict = {
+            'modelsSelected':      modelSelection,
+            'scenariosSelected':   scenarioSelection,
+            'climsSelected':       climSelection,
+            'rangesSelected':      rangeSelection,
+            'latsSelected':        latSelection,
+            'lonsSelected':        lonSelection,
+            'spatialMeanSelected': spatialMeanSelection,
+            'xAxisSelected':       xAxisSelection,
+            'yAxisSelected':       yAxisSelection,
+            'yUnitsSelected':      yUnitsSelection
+        }
+
+        interactive = widgets.interactive(self.displayChart, **argDict)
+
+        row1 = widgets.HBox((modelSelection, scenarioSelection, climSelection))
+        row2 = widgets.HBox((rangeSelection, latSelection, lonSelection))
+        row3 = widgets.HBox((spatialMeanSelection, xAxisSelection, yAxisSelection, yUnitsSelection))
+
+        app = widgets.VBox((row1, row2, row3, self.figure, interactive.children[-1]))
+
+        return app
 
 
     def displayChart(self, modelsSelected, scenariosSelected, climsSelected,
