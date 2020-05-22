@@ -1,4 +1,4 @@
-from matplotlib import pyplot
+import plotly.graph_objs as go
 
 import netCDF4
 import numpy
@@ -72,7 +72,6 @@ class StatsViewer(object):
         )
 
         self.figure = figure
-        self.axes   = figure.add_subplot()
 
 
     def displayChart(self, modelsSelected, scenariosSelected, climsSelected,
@@ -285,8 +284,10 @@ class StatsViewer(object):
         for index, size in enumerate(namesShape):
             if 1 < size:
                 newNames.append(names[index])
-            else:
+            elif 1 == size:
                 titleElements.append(names[index][0])
+            else:
+                print('size zero names list for index, size =', index, size)
 
         names = newNames
 
@@ -294,9 +295,9 @@ class StatsViewer(object):
 
         titleElements = [ x for x in titleElements if x not in ('latmean', 'lonmean', 'modelmean') ]
         
-        titleElements = '\n'.join(titleElements)
+        titleText = '<br>'.join(titleElements)
 
-        title = '%s for %s' % ( yAxisSelected, titleElements )
+        title = '%s for %s' % ( yAxisSelected, titleText )
 
         barLabels = None
 
@@ -345,28 +346,16 @@ class StatsViewer(object):
         numBarsInGroup = plotValues.shape[0]
         numGroups      = plotValues.shape[1]
 
-        barGroupWidth = 0.75
-        barWidth      = barGroupWidth / float(numBarsInGroup)
-        
-        barLocations  = numpy.arange(0, plotValues.size, dtype = float).reshape((numBarsInGroup, numGroups))
-        barLocations %= numGroups
-        
-        barGroupCenters = barLocations[0].copy()
+        xTicks = [ i for i in range(0, numGroups) ]
 
-        barOffsets  = numpy.arange(0, numBarsInGroup, dtype = float).reshape((numBarsInGroup, 1))
-        barOffsets -= (numBarsInGroup - 1) / 2.0
-        barOffsets *= barWidth
-        
-        barLocations += barOffsets
-
-        self.figure.suptitle(title)
-        self.axes.cla()
-        
         plotMax = 1.05 * plotValues.max()
         plotMin = 0.85 * plotValues.min()
         
-        self.axes.set_ylim(bottom = plotMin, top = plotMax)
-
+        plotUnits = self.valueUnits
+        
+        if 'values' != yAxisSelected:
+            plotUnits = 'future/historical'
+            
         makeLegend = True
 
         if barLabels is None:
@@ -374,23 +363,29 @@ class StatsViewer(object):
 
             barLabels = [ None ] * numBarsInGroup
 
-        for label, xs, ys in zip(barLabels, barLocations[:], plotValues[:]):
-        
-            self.axes.bar(xs, ys, barWidth, label = label)
-        
-        plotUnits = self.valueUnits
-        
-        if 'values' != yAxisSelected:
-            plotUnits = 'future/historical'
-            
-        self.axes.set_ylabel(plotUnits)
-        self.axes.set_xticks(barGroupCenters)
-     
-        xTickLabels = self.axes.set_xticklabels(xLabels)
+        data = []
 
-        if True == makeLegend:
-            self.axes.legend(bbox_to_anchor = (1.04, 0.0), loc = 'lower left', borderaxespad = 0)
+        for label, ys in zip(barLabels, plotValues[:]):
+            data.append(go.Bar(y = ys, name = label))
+        
+        layout = go.Layout(barmode = 'group',
+                           showlegend = makeLegend,
+                           legend_orientation = 'h',
+                           yaxis_title = plotUnits,
+                           xaxis = { 'tickvals': xTicks, 'ticktext': xLabels, 'tickangle':45 },
+                           title = title,
+                           title_x = 0.5,
+                           height = 1000,
+                           margin = { 'b': 40 })
 
-        #self.figure.subplots_adjust(right = 0.5, bottom = 0.2)
+        with self.figure.batch_update():
+            self.figure.data   = []
+            self.figure.layout = {}
 
-        pyplot.setp(xTickLabels, rotation=45, ha="right", rotation_mode="anchor")
+            self.figure.add_traces(data)
+            self.figure.layout = layout
+
+            self.figure.update_yaxes(range = [plotMin, plotMax])
+
+            if True == makeLegend:
+                self.figure.update_layout(legend = { 'y': -0.1 })
