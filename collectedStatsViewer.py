@@ -7,8 +7,6 @@ import os
 import sys
 import warnings
 
-#warnings.simplefilter('ignore')
-
 
 class StatsViewer(object):
     def __init__(self, inputFile):
@@ -128,227 +126,144 @@ class StatsViewer(object):
     def displayChart(self, modelsSelected, scenariosSelected, climsSelected,
                      rangesSelected, latsSelected, lonsSelected,
                      spatialMeanSelected, xAxisSelected, yAxisSelected, yUnitsSelected):
-        # Build the data selection.
+        # Build copies of the multi-selection inputs.
+        #
+        modelsSelected    = list(modelsSelected)
+        scenariosSelected = list(scenariosSelected)
+        climsSelected     = list(climsSelected)
+        rangesSelected    = list(rangesSelected)
+        latsSelected      = list(latsSelected)
+        lonsSelected      = list(lonsSelected)
+
+        # Build the seasonal or monthly data selection.
         #
         if 'all seasons' == climsSelected[0]:
             climsSelected = list(self.seasons)
-            theClims      = self.seasons
-            values        = self.seasonalValues
-            stdevs        = self.seasonalStdevs
+            theClims      = list(self.seasons)
+            values        = self.seasonalValues.copy()
+            stdevs        = self.seasonalStdevs.copy()
+
         elif 'all months' == climsSelected[0]:
             climsSelected = list(self.months)
-            theClims      = self.months
-            values        = self.monthlyValues
-            stdevs        = self.monthlyStdevs
-        elif set(climsSelected) <= set(self.seasons):
-            theClims = self.seasons
-            values   = self.seasonalValues
-            stdevs   = self.seasonalStdevs
-        elif set(climsSelected) <= set(self.months):
-            theClims = self.months
-            values   = self.monthlyValues
-            stdevs   = self.monthlyStdevs
-        else:
-            raise ValueError('Selecting a mix of months and seasons is forbidden')
+            theClims      = list(self.months)
+            values        = self.monthlyValues.copy()
+            stdevs        = self.monthlyStdevs.copy()
 
+        elif set(climsSelected) <= set(self.seasons):
+            theClims = list(self.seasons)
+            values   = self.seasonalValues.copy()
+            stdevs   = self.seasonalStdevs.copy()
+
+        elif set(climsSelected) <= set(self.months):
+            theClims = list(self.months)
+            values   = self.monthlyValues.copy()
+            stdevs   = self.monthlyStdevs.copy()
+
+        else:
+            warnings.warn('Selecting a mix of months and seasons is forbidden.')
+
+            return
+
+        # Scale the values.
+        #
         values = values * self.yUnitsFactors[yUnitsSelected]
 
+        # Get the historical values.
+        #
+        index = self.scenarios[1:].index('historical')
+
+        historicalValues = values[:,index:index+1]
+
+        # Remove the non-historical year sets from the historical values.
+        # (There is only one historical year per model.)
+        #
+        historicalShape = list(historicalValues.shape)
+
+        numSets = numpy.prod(historicalShape[0:3])
+        numInSet = numpy.prod(historicalShape[3:])
+
+        historicalValues = historicalValues.reshape((numSets, numInSet))
+
+        takes = 0 < historicalValues.count(axis = 1)
+
+        historicalValues = historicalValues.compress(takes, axis = 0)
+
+        historicalShape[2] = 1
+
+        historicalValues = historicalValues.reshape(historicalShape)
+
+        # Get the model, scenario, year range, latitude, and longitude
+        # selections.
+        #
         if 'all' == modelsSelected[0]:
-            modelsSelected = self.models[1:]
+            modelsSelected = list(self.models[1:])
 
         if 'all' == scenariosSelected[0]:
-            scenariosSelected = self.scenarios[1:]
+            scenariosSelected = list(self.scenarios[1:])
         
         if 'all' == rangesSelected[0]:
-            rangesSelected = self.yearRanges[1:]
+            rangesSelected = list(self.yearRanges[1:])
         
         if 'all' == latsSelected[0]:
-            latsSelected = self.latRanges[1:]
+            latsSelected = list(self.latRanges[1:])
         
         if 'all' == lonsSelected[0]:
-            lonsSelected = self.lonRanges[1:]
+            lonsSelected = list(self.lonRanges[1:])
         
         if 'values' != yAxisSelected:
-            scenariosSelected = list(scenariosSelected)
-
             try:
                 scenariosSelected.remove('historical')
             except:
                 pass
 
-        indices  = ( [], [], [], [], [], [] )
-        indexMap = ( [], [], [], [], [], [] )
-        names    = ( [], [], [], [], [], [] )
-        
-        for model in modelsSelected:
-            modelIndex = self.models.index(model) - 1
-
-            for scenario in scenariosSelected:
-                scenarioIndex = self.scenarios.index(scenario) - 1
-                
-                for yearRange in rangesSelected:
-                    rangeIndex = self.yearRanges.index(yearRange) - 1
-                    
-                    if 0 == values[modelIndex, scenarioIndex, rangeIndex].count():
-                        continue
-
-                    if model not in names[0]:
-                        indexMap[0].append(modelIndex)
-                        names[0].append(model)
-                    
-                    if scenario not in names[1]:
-                        indexMap[1].append(scenarioIndex)
-                        names[1].append(scenario)
-                    
-                    if yearRange not in names[2]:
-                        indexMap[2].append(rangeIndex)
-                        names[2].append(yearRange)
-                    
-                    for clim in climsSelected:
-                        climIndex = theClims.index(clim)
-                    
-                        if clim not in names[3]:
-                            indexMap[3].append(climIndex)
-                            names[3].append(clim)
-                        
-                        for latRange in latsSelected:
-                            latIndex = self.latRanges.index(latRange) - 1
-                        
-                            if latRange not in names[4]:
-                                indexMap[4].append(latIndex)
-                                names[4].append(latRange)
-                            
-                            for lonRange in lonsSelected:
-                                lonIndex = self.lonRanges.index(lonRange) - 1
-                        
-                                if lonRange not in names[5]:
-                                    indexMap[5].append(lonIndex)
-                                    names[5].append(lonRange)
-                            
-                                indices[0].append(modelIndex)
-                                indices[1].append(scenarioIndex)
-                                indices[2].append(rangeIndex)
-                                indices[3].append(climIndex)
-                                indices[4].append(latIndex)
-                                indices[5].append(lonIndex)
-
-        shape = (
-            len(names[0]),
-            len(names[1]),
-            len(names[2]),
-            len(names[3]),
-            len(names[4]),
-            len(names[5])
-        )
-
-        plotValues = numpy.ma.masked_all(shape, dtype = values.dtype)
-
-        def mapIndices(mapList, indices):
-            mappedIndices = list()
-
-            for mapper, index in zip(mapList, indices):
-                mappedIndices.append(mapper.index(index))
-
-            return tuple(mappedIndices)
-
-        for inIndices in zip(*indices):
-
-            outIndices = mapIndices(indexMap, inIndices)
-
-            plotValues[outIndices] = values[inIndices]
-
-        historicalValues = None
-
-        if 'values' != yAxisSelected:
-            historicalIndices  = ( [], [], [], [], [], [] )
-            historicalIndexMap = ( [], [], [], [], [], [] )
-            historicalNames    = ( [], [], [], [], [], [] )
-
-            scenarioIndex = self.scenarios.index('historical') - 1
-
-
-            for model in modelsSelected:
-                if model not in names[0]:
-                    continue
-
-                modelIndex = self.models.index(model) - 1
-
-                for yearRange in self.yearRanges[1:]:
-                    rangeIndex = self.yearRanges.index(yearRange) - 1
-                    
-                    if 0 == values[modelIndex, scenarioIndex, rangeIndex].count():
-                        continue
-
-                    if model not in historicalNames[0]:
-                        historicalIndexMap[0].append(modelIndex)
-                        historicalNames[0].append(model)
-                    
-                    if scenario not in historicalNames[1]:
-                        historicalIndexMap[1].append(scenarioIndex)
-                        historicalNames[1].append('historical')
-                    
-                    if yearRange not in historicalNames[2]:
-                        historicalIndexMap[2].append(rangeIndex)
-                        historicalNames[2].append(yearRange)
-                    
-                    for clim in climsSelected:
-                        climIndex = theClims.index(clim)
-
-                        if clim not in historicalNames[3]:
-                            historicalIndexMap[3].append(climIndex)
-                            historicalNames[3].append(clim)
-                        
-                        for latRange in latsSelected:
-                            latIndex = self.latRanges.index(latRange) - 1
-                        
-                            if latRange not in historicalNames[4]:
-                                historicalIndexMap[4].append(latIndex)
-                                historicalNames[4].append(latRange)
-                            
-                            for lonRange in lonsSelected:
-                                lonIndex = self.lonRanges.index(lonRange) - 1
-                        
-                                if lonRange not in historicalNames[5]:
-                                    historicalIndexMap[5].append(lonIndex)
-                                    historicalNames[5].append(lonRange)
-                            
-                                historicalIndices[0].append(modelIndex)
-                                historicalIndices[1].append(scenarioIndex)
-                                historicalIndices[2].append(rangeIndex)
-                                historicalIndices[3].append(climIndex)        
-                                historicalIndices[4].append(latIndex)
-                                historicalIndices[5].append(lonIndex)
-
-            historicalShape = (
-                len(historicalNames[0]),
-                1,
-                1,
-                len(historicalNames[3]),
-                len(historicalNames[4]),
-                len(historicalNames[5])
-            )
-
-            historicalValues = numpy.ma.masked_all(historicalShape, dtype = values.dtype)
-
-            def mapIndices(mapList, indices):
-                mappedIndices = list()
-
-                for i, (mapper, index) in enumerate(zip(mapList, indices)):
-                    outIndex = 0 if i in (1, 2) else mapper.index(index)
-
-                    mappedIndices.append(outIndex)
-
-                return tuple(mappedIndices)
-
-            for inIndices in zip(*historicalIndices):
-                outIndices = mapIndices(historicalIndexMap, inIndices)
-
-                historicalValues[outIndices] = values[inIndices]
-
-        names = list(names)
-
+        # Make a list to hold names that will get shifted to the title for
+        # various reasons.
+        #
         tailsForTitle = list()
 
+        # Get lists of all the names and lists of the indices for the selected
+        # names.
+        #
+        names = [
+            list(self.models[1:]),
+            list(self.scenarios[1:]),
+            list(self.yearRanges[1:]),
+            list(theClims),
+            list(self.latRanges[1:]),
+            list(self.lonRanges[1:])
+        ]
+
+        selectionIndices = [
+            [ names[0].index(x) for x in modelsSelected ],
+            [ names[1].index(x) for x in scenariosSelected ],
+            [ names[2].index(x) for x in rangesSelected ],
+            [ names[3].index(x) for x in climsSelected ],
+            [ names[4].index(x) for x in latsSelected ],
+            [ names[5].index(x) for x in lonsSelected ]
+        ]
+
+        # Subset the values and historical values by the selections.
+        #
+        selectionMesh = numpy.meshgrid(*selectionIndices, indexing = 'ij', sparse = True)
+
+        values = values[tuple(selectionMesh)]
+
+        selectionMesh[1] = 0
+        selectionMesh[2] = 0
+
+        historicalValues = historicalValues[tuple(selectionMesh)]
+
+        # If the selection is empty, report it and return.
+        #
+        if 0 == values.count():
+            warnings.warn('Nothing to display.')
+
+            return
+
+        # If some spatial mean has been selected, take it. Adjust the name
+        # lists and selection index lists appropriately. Save the detailed
+        # spatial labeling in the title tails list.
+        #
         if 'none' != spatialMeanSelected:
             picks = None
 
@@ -362,7 +277,9 @@ class StatsViewer(object):
                 picks = [ (4, 'lat', latsSelected), (5, 'lon', lonsSelected) ]
 
             for index, name, selected in picks:
-                plotValues = plotValues.mean(axis = index, keepdims = True)
+                values = values.mean(axis = index, keepdims = True)
+
+                historicalValues = historicalValues.mean(axis = index, keepdims = True)
 
                 selectionName = '%smean(%s)' % ((name, ','.join(selected)))
 
@@ -370,142 +287,130 @@ class StatsViewer(object):
 
                 names[index] = [ '%smean' % (name,) ]
 
-            if historicalValues is not None:
-                for index, name, selected in picks:
-                    historicalValues = historicalValues.mean(axis = index, keepdims = True)
+                selectionIndices[index] = 0
 
-        if historicalValues is not None:
-            plotValues /= historicalValues
+        # If ratios were selected, take the ratio.
+        #
+        if 'values' != yAxisSelected:
+            values /= historicalValues
 
+        # Rotate the lists and the values array to put the selected x axis
+        # dimension last, then flatten all but the last dimension of the array.
+        #
         xAxisIndex = self.xAxisOptions.index(xAxisSelected)
         
         xLabels = names.pop(xAxisIndex)
 
-        names.append(xLabels)
-        
-        dimensions = [ x for x in range(0, plotValues.ndim) ]
+        xLabelIndices = numpy.array(selectionIndices.pop(xAxisIndex))
+
+        dimensions = [ x for x in range(0, values.ndim) ]
         
         del dimensions[xAxisIndex]
         
         dimensions.append(xAxisIndex)
         
-        plotValues = plotValues.transpose(dimensions)
+        values = values.transpose(dimensions)
 
-        for dim in range(0, plotValues.ndim):
-            axes = [ i for i in range(0, plotValues.ndim) ]
+        values = values.reshape((values.size // values.shape[-1], values.shape[-1]))
 
-            del axes[dim]
+        # Create a list of tuples of indices into the names for building the
+        # bar labels, then turn it into an array.
+        #
+        selectionMesh = numpy.meshgrid(*selectionIndices, indexing = 'ij')
 
-            takes = 0 < plotValues.count(axis = tuple(axes))
+        selectionMesh = [ x.ravel() for x in selectionMesh ]
 
-            if False in takes:
-                plotValues = plotValues.compress(takes, axis = dim)
+        indexList = [ x for x in zip(*selectionMesh) ]
 
-                newNames = list()
+        barLabelIndices = numpy.array(indexList)
 
-                for index, name in enumerate(names[dim]):
-                    if True == takes[index]:
-                        newNames.append(name)
+        # Remove any empty rows or columns from the values array. Remove the
+        # corresponding elements from the bar label indices and x label indices
+        # arrays.
+        #
+        takes = 0 < values.count(axis = 0)
 
-                names[dim] = newNames
+        values          = values.compress(takes, axis = 1)
+        xLabelIndices   = xLabelIndices.compress(takes)
 
-        xLabels = names.pop(-1)
+        takes = 0 < values.count(axis = 1)
 
-        numBarsInGroup = numpy.prod(plotValues.shape[0:-1])
-        numGroups      = plotValues.shape[-1]
-        
-        plotValues = plotValues.reshape((numBarsInGroup, numGroups))
-        
+        values  = values.compress(takes, axis = 0)
+        barLabelIndices = barLabelIndices.compress(takes, axis = 0)
+
+        numBarsInGroup = values.shape[0]
+        numGroups      = values.shape[1]
+
+        # Find all constant name elements in the bar labels.
+        #
+        constantLabelIndices = numpy.full((5,), -1, dtype = int)
+
+        for col, sub in enumerate(barLabelIndices.T):
+            unique = numpy.unique(sub)
+
+            if 1 == unique.size:
+                constantLabelIndices[col] = unique[0]
+
+        # Remove the columns that are constant and add the elements to the title elements.
+        #
+        takes = -1 == constantLabelIndices
+
+        barLabelIndices = barLabelIndices.compress(takes, axis = 1)
+
         titleElements = list()
         newNames      = list()
 
-        namesShape = [ len(x) for x in names ]
-
-        for index, size in enumerate(namesShape):
-            if 1 < size:
-                newNames.append(names[index])
-            elif 1 == size:
-                titleElements.append(names[index][0])
+        for row, col in enumerate(constantLabelIndices):
+            if -1 == col:
+                newNames.append(names[row])
             else:
-                print('size zero names list for index, size =', index, size)
-
+                titleElements.append(names[row][col])
+                
         names = newNames
 
+        # Build the graph title.
+        #
         titleElements += tailsForTitle
 
-        titleElements = [ x for x in titleElements if x not in ('latmean', 'lonmean', 'modelmean') ]
+        titleElements = [ x for x in titleElements if x not in ('latmean', 'lonmean') ]
         
         titleText = '<br>'.join(titleElements)
 
         title = '%s for %s' % ( yAxisSelected, titleText )
 
+        # Build the bar labels.
+        #
         barLabels = None
+        makeLegend = True
 
-        if 0 < len(names):
-            namesShape = [ len(x) for x in names ]
+        if 2 > len(barLabelIndices):
+            makeLegend = False
 
-            nameIndices = numpy.indices(namesShape)
-            nameIndices = nameIndices.reshape(len(names), nameIndices.size // len(names)).T
-
+            barLabels = [ None ] * numBarsInGroup
+        else:
             barLabels = list()
 
-            for indices in nameIndices[:]:
-                barLabel = list() 
+            for indexList in barLabelIndices:
+                nameList = [ names[i][j] for i, j in enumerate(indexList) ]
 
-                for i, j in enumerate(indices):
-                    barLabel.append(names[i][j])
+                barLabels.append(' '.join(nameList))
 
-                barLabels.append(' '.join(barLabel))
+        # Build the x axis labels and locations.
+        #
+        xLabels = [ xLabels[i] for i in xLabelIndices ]
+        xTicks  = [ i for i in range(0, numGroups) ]
 
-        takes = 0 < plotValues.count(axis = 1)
-
-        if False in takes:
-            plotValues = plotValues.compress(takes, axis = 0)
-
-            newLabels = list()
-
-            for index, label in enumerate(barLabels):
-                if True == takes[index]:
-                    newLabels.append(label)
-
-            barLabels = newLabels
-
-        takes = 0 < plotValues.count(axis = 0)
-
-        if False in takes:
-            plotValues = plotValues.compress(takes, axis = 1)
-
-            newLabels = list()
-
-            for index, label in enumerate(xLabels):
-                if True == takes[index]:
-                    newLabels.append(label)
-
-            xLabels = newLabels
-
-        numBarsInGroup = plotValues.shape[0]
-        numGroups      = plotValues.shape[1]
-
-        xTicks = [ i for i in range(0, numGroups) ]
-
-        plotMax = 1.05 * plotValues.max()
-        plotMin = 0.85 * plotValues.min()
+        plotMax = 1.05 * values.max()
+        plotMin = 0.85 * values.min()
         
         plotUnits = yUnitsSelected
         
         if 'values' != yAxisSelected:
             plotUnits = 'future/historical'
             
-        makeLegend = True
+        data = list()
 
-        if barLabels is None:
-            makeLegend = False
-
-            barLabels = [ None ] * numBarsInGroup
-
-        data = []
-
-        for label, ys in zip(barLabels, plotValues[:]):
+        for label, ys in zip(barLabels, values[:]):
             data.append(go.Bar(y = ys, name = label))
         
         layout = go.Layout(barmode = 'group',
